@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Xml.Linq;
 
 namespace Snake
 {
@@ -27,12 +29,27 @@ namespace Snake
         // вся змея
         List<PositionedEntity> snake;
         // яблоко
-        Apple apple;
+        List<Apple> apples = new List<Apple>();
         //количество очков
         int score;
         //таймер по которому 
         DispatcherTimer moveTimer;
-        
+
+
+        /*      Добавить переменную состояния
+         *      Добавить временную переменную
+         *      Объявите случайную переменную вне цикла, чтобы получить разные числа
+         */
+        DateTime timeStamp;
+        bool stt = false;
+        private static Random random = new Random();
+        /*
+         * 
+         * 
+         * 
+         */
+
+
         //конструктор формы, выполняется при запуске программы
         public MainWindow()
         {
@@ -44,7 +61,7 @@ namespace Snake
 
             //создаем таймер срабатывающий раз в 300 мс
             moveTimer = new DispatcherTimer();
-            moveTimer.Interval = new TimeSpan(0, 0, 0, 0, 300);
+            moveTimer.Interval = new TimeSpan(0, 0, 0, 0, 130);
             moveTimer.Tick += new EventHandler(moveTimer_Tick);
             
         }
@@ -52,17 +69,24 @@ namespace Snake
         //метод перерисовывающий экран
         private void UpdateField()
         {
-            //обновляем положение элементов змеи
-            foreach (var p in snake)
-            {
-                Canvas.SetTop(p.image, p.y);
-                Canvas.SetLeft(p.image, p.x);
-            }
 
-            //обновляем положение яблока
-            Canvas.SetTop(apple.image, apple.y);
-            Canvas.SetLeft(apple.image, apple.x);
-            
+        /*  Используйте список яблок List
+         *  В обычном режиме в списке будет 1 яблоко
+         *  В бонусном режиме в списке будет 25 яблок.
+         */
+        foreach (var a in apples)
+        {
+            Canvas.SetTop(a.image, a.y);
+            Canvas.SetLeft(a.image, a.x);
+        }
+
+            //обновляем положение элементов змеи
+        foreach (var p in snake)
+        {
+            Canvas.SetTop(p.image, p.y);
+            Canvas.SetLeft(p.image, p.x);
+        }
+
             //обновляем количество очков
             lblScore.Content = String.Format("{0}000", score);
         }
@@ -70,46 +94,96 @@ namespace Snake
         //обработчик тика таймера. Все движение происходит здесь
         void moveTimer_Tick(object sender, EventArgs e)
         {
-            //в обратном порядке двигаем все элементы змеи
-            foreach (var p in Enumerable.Reverse(snake))
-            {
-                p.move();
-            }
 
-            //проверяем, что голова змеи не врезалась в тело
-            foreach (var p in snake.Where(x => x != head))
+
+        /*  Добавьте условные операторы для проверки перехода в бонусный режим.
+         * 
+         * 
+         * 
+         */
+            if (score % 50 == 0 && score != 0 && stt == false)
             {
-                //если координаты головы и какой либо из частей тела совпадают
-                if (p.x == head.x && p.y == head.y)
+                timeStamp = DateTime.Now;
+                stt = true;
+                for (int i = 0; i < 25; i++)
+                {
+                    var part = new Apple(snake);
+                    apples.Add(part);
+                    canvas1.Children.Add(part.image);
+
+                }
+            }
+            if ((DateTime.Now.Second - timeStamp.Second > 10)&&stt == true)
+            {
+                stt = false;
+                foreach (var a in apples)
+                {
+                    canvas1.Children.Remove(a.image); //Удалить каждое яблоко на экране
+                }
+                apples.Clear(); // Удалить каждое яблоко в списке List
+                apples.Add(new Apple(snake)); // Добавьте 1 новое яблоко в список List
+                canvas1.Children.Add(apples[0].image); // И добавьте это новое яблоко на экран
+
+            }
+            /*
+             *   
+             * 
+             * 
+             * 
+             */
+
+
+
+
+                //в обратном порядке двигаем все элементы змеи
+                foreach (var p in Enumerable.Reverse(snake))
+                {
+                    p.move();
+                }
+
+
+                //проверяем, что голова змеи не врезалась в тело
+                foreach (var p in snake.Where(x => x != head))
+                {
+                    //если координаты головы и какой либо из частей тела совпадают
+                    if (p.x == head.x && p.y == head.y)
+                    {
+                        //мы проиграли
+                        moveTimer.Stop();
+                        tbGameOver.Visibility = Visibility.Visible;
+                        return;
+                    }
+                }
+
+                //проверяем, что голова змеи не вышла за пределы поля
+                if (head.x < 40 || head.x >= 540 || head.y < 40 || head.y >= 540)
                 {
                     //мы проиграли
                     moveTimer.Stop();
                     tbGameOver.Visibility = Visibility.Visible;
                     return;
                 }
-            }
 
-            //проверяем, что голова змеи не вышла за пределы поля
-            if (head.x < 40 || head.x >= 540 || head.y < 40 || head.y >= 540)
-            {
-                //мы проиграли
-                moveTimer.Stop();
-                tbGameOver.Visibility = Visibility.Visible;
-                return;
-            }
+                //проверяем, что голова змеи врезалась в яблоко
+                foreach (var a in apples)
+                {
+                    if (head.x == a.x && head.y == a.y)
+                    {
+                        //увеличиваем счет
+                        score++;
+                        //двигаем яблоко на новое место
+                        a.clear();                                              //  В бонусном режиме я буду очищать яблоки с помощью функции clear().
+                        if (stt == true) a.clear();                             //  В обычном режиме я буду двигать яблоко
+                        else a.move();                                          //  В обычном режиме я буду двигать яблоко
+                        // добавляем новый сегмент к змее
+                        var part = new BodyPart(snake.Last());
+                        canvas1.Children.Add(part.image);
+                        snake.Add(part);
+                    }
+                }
 
-            //проверяем, что голова змеи врезалась в яблоко
-            if (head.x == apple.x && head.y == apple.y)
-            {
-                //увеличиваем счет
-                score++;
-                //двигаем яблоко на новое место
-                apple.move();
-                // добавляем новый сегмент к змее
-                var part = new BodyPart(snake.Last());
-                canvas1.Children.Add(part.image);
-                snake.Add(part);
-            }
+            
+
             //перерисовываем экран
             UpdateField();
         }
@@ -148,14 +222,15 @@ namespace Snake
             
             // добавляем поле на канвас
             canvas1.Children.Add(field.image);
-            // создаем новое яблоко и добавлем его
-            apple = new Apple(snake);
-            canvas1.Children.Add(apple.image);
+
             // создаем голову
             head = new Head();
             snake.Add(head);
             canvas1.Children.Add(head.image);
-            
+            // создаем новое яблоко и добавлем его
+            apples.Add(new Apple(snake));
+            canvas1.Children.Add(apples[0].image);
+
             //запускаем таймер
             moveTimer.Start();
             UpdateField();
@@ -238,11 +313,10 @@ namespace Snake
 
             public override void move()
             {
-                Random rand = new Random();
                 do
                 {
-                    x = rand.Next(13) * 40 + 40;
-                    y = rand.Next(13) * 40 + 40;
+                    x = random.Next(13) * 40 + 40;
+                    y = random.Next(13) * 40 + 40;
                     bool overlap = false;
                     foreach (var p in m_snake)
                     {
@@ -256,6 +330,16 @@ namespace Snake
                         break;
                 } while (true);
 
+            }
+            /*  Поскольку я не знаю, как удалить яблоко, я перейду в другую область, а затем удалю его в «List».
+             * 
+             * 
+             * 
+             * 
+             */
+            public void clear()
+            {
+                x = y = -80;
             }
         }
 
